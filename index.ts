@@ -4,27 +4,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { proxyLazy } from "@utils/lazy";
 import definePlugin from "@utils/types";
-import { React, useEffect } from "@webpack/common";
+import { useEffect, zustandCreate } from "@webpack/common";
 import type { RefObject } from "react";
 
-const zoomedStreams = new Set<string>();
+type ZoomState = Partial<Record<string, boolean>>;
+
+const useZoomStore = proxyLazy(() => zustandCreate(() => ({})));
 const ratios = new WeakMap<HTMLElement, number>();
-const listeners = new Set<() => void>();
-
-function setZoomed(streamKey: string, zoomed: boolean) {
-    if (zoomedStreams.has(streamKey) === zoomed) return;
-
-    if (zoomed) zoomedStreams.add(streamKey);
-    else zoomedStreams.delete(streamKey);
-
-    for (const listener of listeners) listener();
-}
-
-function subscribe(listener: () => void) {
-    listeners.add(listener);
-    return () => void listeners.delete(listener);
-}
 
 function baseSize(wrapper: HTMLElement) {
     const { clientWidth, clientHeight } = wrapper;
@@ -57,8 +45,8 @@ export default definePlugin({
         {
             find: "focused:!0,noBorder:",
             replacement: {
-                match: /let (\i)=(\i)\.useMemo\(\(\)=>(\i)&&(\i)\?(\i)\/\((\i)-2\*(\i)\):(.{0,80}?),\[(\i(?:,\i)*)\]\)/,
-                replace: "let vcZoomed=$self.useZoomed(arguments[0].selectedParticipant.id),$1=$2.useMemo(()=>vcZoomed||$3&&$4?$5/($6-2*$7):$8,[$9,vcZoomed])"
+                match: /let (\i)=\i\.useMemo\(\(\)=>(\i&&\i\?\i\/\(\i-2\*\i\):.{0,80}?),\[\i(?:,\i)*\]\)/,
+                replace: "let $1=$self.useZoomed(arguments[0].selectedParticipant.id)||$2"
             }
         },
         {
@@ -79,13 +67,13 @@ export default definePlugin({
     useZoomState(streamKey: string, zoomed: boolean, wrapperRef: RefObject<HTMLElement>, ratio: number) {
         useEffect(() => {
             if (wrapperRef.current) ratios.set(wrapperRef.current, ratio);
-            setZoomed(streamKey, zoomed);
-            return () => setZoomed(streamKey, false);
+            useZoomStore.setState({ [streamKey]: zoomed });
+            return () => useZoomStore.setState({ [streamKey]: false });
         }, [streamKey, zoomed, ratio]);
     },
 
-    useZoomed(streamKey: string) {
-        return React.useSyncExternalStore(subscribe, () => zoomedStreams.has(streamKey));
+    useZoomed(streamKey: string): boolean {
+        return useZoomStore((state: ZoomState) => state[streamKey] ?? false);
     },
 
     baseSize,
