@@ -1,18 +1,21 @@
-# streamzoomfill
+# streamZoomFill
 
-lets a zoomed in stream fill the whole video area instead of staying inside its 16:9 box.
+zoom into a stream and it actually fills your screen instead of being locked inside a 16:9 box
+
+![stock vs streamZoomFill](screenshot.png)
 
 ## why
 
-discord fits a stream into a box with the same aspect ratio as the video and zooming only ever happens inside that box. on a portrait monitor (or anything that isn't the shape of the stream) that leaves most of the screen black no matter how far you zoom in.
+in discord, when zooming in on a stream, you are limited by the box shape of that stream. in vertical displays and narrow windows, you'll have big black bars even at high zoom levels
 
-## what changes
+## what it does
 
-- once you zoom past 100% the focused tile grows to the whole video area
-- panning is clamped to the video itself, so it can't be dragged off screen
-- the minimap and click to pan know about the bigger tile
-- at 100% nothing is touched
+- past 100%, the stream fills the entire video element
+- you can't drag it out of the screen while panning
+- the minimap still works
+- at 100% it doesn't do anything
+
 
 ## install
 
-if you made it here you probably already know how to install custom plugins, but if not just check [vencord's guide](https://docs.vencord.dev/installing/custom-plugins/).
+if you made it here you probably already know how to install custom plugins, but if not just check [vencord's guide](https://docs.vencord.dev/installing/custom-plugins/)
