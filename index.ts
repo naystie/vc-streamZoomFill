@@ -33,20 +33,20 @@ export default definePlugin({
             find: "videoAspectRatio:16/9",
             replacement: [
                 {
-                    match: /\{streamKey:(\i),minZoom:(\i)=.{0,40}?\[(\i),\i\]=(\i)\.useState\(\2\),.{0,120}?\[(\i),\i\]=\4\.useState\(16\/9\),.{0,60}?(\i)=\4\.useRef\(null\),\i=\4\.useRef\(null\);/,
-                    replace: "$&$self.useZoomState($1,$3>$2,$6,$5);"
+                    match: /minZoom:(\i)=.{0,40}?\[(\i),\i\]=(\i)\.useState\(\1\),.{0,120}?\[(\i),\i\]=\3\.useState\(16\/9\),.{0,60}?(\i)=\3\.useRef\(null\),\i=\3\.useRef\(null\);/,
+                    replace: "$&$self.useZoomState(arguments[0].streamKey,$2>$1,$5,$4);"
                 },
                 {
-                    match: /(\i)=(\i)\.current\.clientWidth,(\i)=\2\.current\.clientHeight,(\i)=\1\*\((\i)-1\)\/2,(\i)=\3\*\(\5-1\)\/2;/,
-                    replace: "$&[$4,$6]=$self.panBounds($2.current,$5);"
+                    match: /(?<=(\i)\.current\.clientHeight,)(\i)=\i\*\((\i)-1\)\/2,(\i)=\i\*\(\3-1\)\/2/,
+                    replace: "[$2,$4]=$self.panBounds($1.current,$3)"
                 }
             ]
         },
         {
-            find: "focused:!0,noBorder:",
+            find: /focused:!0,noBorder:\i>=/,
             replacement: {
-                match: /let (\i)=\i\.useMemo\(\(\)=>(\i&&\i\?\i\/\(\i-2\*\i\):.{0,80}?),\[\i(?:,\i)*\]\)/,
-                replace: "let $1=$self.useZoomed(arguments[0].selectedParticipant.id)||$2"
+                match: /let (\i)=\i\.useMemo\(\(\)=>(\i&&\i\?(\i\/\(\i-2\*\i\)):.{0,80}?),\[\i(?:,\i)*\]\)/,
+                replace: "let $1=$self.useZoomed(arguments[0].selectedParticipant.id)?$3:$2"
             }
         },
         {
@@ -57,8 +57,8 @@ export default definePlugin({
                     replace: "let [$4,$6,$7,$9]=$self.indicator($2.current,$5,$8)"
                 },
                 {
-                    match: /(\i)=(\i)\.current\.clientWidth,(\i)=\2\.current\.clientHeight,(\i)=(\i)\.x-(\i)\.left,/,
-                    replace: "[$1,$3]=$self.baseSize($2.current),$4=$5.x-$6.left,"
+                    match: /(\i)=(\i)\.current\.clientWidth,(\i)=\2\.current\.clientHeight(?=,\i=\i\.x-\i\.left,)/,
+                    replace: "[$1,$3]=$self.baseSize($2.current)"
                 }
             ]
         }
