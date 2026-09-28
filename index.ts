@@ -6,20 +6,33 @@
 
 import { proxyLazy } from "@utils/lazy";
 import definePlugin from "@utils/types";
-import { useEffect, zustandCreate } from "@webpack/common";
+import { useLayoutEffect, zustandCreate } from "@webpack/common";
 import type { RefObject } from "react";
 
+type WrapperRef = RefObject<HTMLElement | null>;
 type ZoomState = Partial<Record<string, boolean>>;
 
+interface ZoomContext {
+    zoomLevel: number;
+    minZoom: number;
+    videoAspectRatio: number;
+    wrapperRef: WrapperRef;
+}
+
 const useZoomStore = proxyLazy(() => zustandCreate(() => ({})));
-const ratios = new WeakMap<HTMLElement, number>();
+const ratios = new WeakMap<WrapperRef, number>();
 
-function baseSize(wrapper: HTMLElement) {
-    const { clientWidth, clientHeight } = wrapper;
-    const ratio = ratios.get(wrapper) ?? clientWidth / clientHeight;
-    const width = Math.min(clientWidth, clientHeight * ratio);
+function fitVideo(ref: WrapperRef, width: number, height: number) {
+    const ratio = ratios.get(ref);
+    if (!ratio || !width || !height) return [width, height];
 
-    return [width, width / ratio];
+    const fitted = Math.min(width, height * ratio);
+    return [fitted, fitted / ratio];
+}
+
+function videoSize(ref: WrapperRef) {
+    const wrapper = ref.current;
+    return wrapper ? fitVideo(ref, wrapper.clientWidth, wrapper.clientHeight) : [1, 1];
 }
 
 export default definePlugin({
@@ -31,66 +44,81 @@ export default definePlugin({
     patches: [
         {
             find: "videoAspectRatio:16/9",
+            group: true,
             replacement: [
                 {
-                    match: /minZoom:(\i)=.{0,40}?\[(\i),\i\]=(\i)\.useState\(\1\),.{0,120}?\[(\i),\i\]=\3\.useState\(16\/9\),.{0,60}?(\i)=\3\.useRef\(null\),\i=\3\.useRef\(null\);/,
-                    replace: "$&$self.useZoomState(arguments[0].streamKey,$2>$1,$5,$4);"
+                    match: /(?=return\(0,\i\.jsx\)\(\i\.Provider,\{value:(\i),children)/,
+                    replace: "$self.useZoomState(arguments[0].streamKey,$1);"
                 },
                 {
                     match: /(?<=(\i)\.current\.clientHeight,)(\i)=\i\*\((\i)-1\)\/2,(\i)=\i\*\(\3-1\)\/2/,
-                    replace: "[$2,$4]=$self.panBounds($1.current,$3)"
+                    replace: "[$2,$4]=$self.panBounds($1,$3)"
                 }
             ]
         },
         {
-            find: /focused:!0,noBorder:\i>=/,
+            find: "focused:!0,noBorder:",
             replacement: {
-                match: /let (\i)=\i\.useMemo\(\(\)=>(\i&&\i\?(\i\/\(\i-2\*\i\)):.{0,80}?),\[\i(?:,\i)*\]\)/,
+                match: /let (\i)=\i\.useMemo\(\(\)=>(\i&&\i\?(\i\/\(\i-2\*\i\)):.{0,150}?),\[\i(?:,\i)*\]\)/,
                 replace: "let $1=$self.useZoomed(arguments[0].selectedParticipant.id)?$3:$2"
             }
         },
         {
             find: "--custom-zoom-minimap-width",
+            group: true,
             replacement: [
                 {
                     match: /let (\i)=null!=(\i)\.current\?\2\.current\.clientWidth:1,(\i)=null!=\2\.current\?\2\.current\.clientHeight:1,(\i)=1\/(\i),(\i)=1\/\5,(\i)=\.5-(\i)\.x\/\(\1\*\5\),(\i)=\.5-\8\.y\/\(\3\*\5\)/,
-                    replace: "let [$4,$6,$7,$9]=$self.indicator($2.current,$5,$8)"
+                    replace: "let [$4,$6,$7,$9]=$self.indicator($2,$5,$8)"
                 },
                 {
                     match: /(\i)=(\i)\.current\.clientWidth,(\i)=\2\.current\.clientHeight(?=,\i=\i\.x-\i\.left,)/,
-                    replace: "[$1,$3]=$self.baseSize($2.current)"
+                    replace: "[$1,$3]=$self.videoSize($2)"
                 }
             ]
+        },
+        {
+            find: "--custom-pan-x",
+            replacement: {
+                match: /(?<=\(0,\i\.\i\)\((\i),\i\.useCallback\(\i=>\{.{0,300}?)(\i)=(\i)\*\((\i)-1\)\/2,(\i)=(\i)\*\(\4-1\)\/2,(\i)=(\i)\*\(\4-1\)\/2,(\i)=(\i)\*\(\4-1\)\/2/,
+                replace: "[$2,$5,$7,$9]=$self.resizeScale($1,$3,$6,$8,$10)"
+            }
         }
     ],
 
-    useZoomState(streamKey: string, zoomed: boolean, wrapperRef: RefObject<HTMLElement>, ratio: number) {
-        useEffect(() => {
-            if (wrapperRef.current) ratios.set(wrapperRef.current, ratio);
-            useZoomStore.setState({ [streamKey]: zoomed });
+    useZoomState(streamKey: string, { zoomLevel, minZoom, videoAspectRatio, wrapperRef }: ZoomContext) {
+        ratios.set(wrapperRef, videoAspectRatio);
+        const zoomed = zoomLevel > minZoom;
+
+        useLayoutEffect(() => {
+            if (!zoomed) return;
+
+            useZoomStore.setState({ [streamKey]: true });
             return () => useZoomStore.setState({ [streamKey]: false });
-        }, [streamKey, zoomed, ratio]);
+        }, [streamKey, zoomed]);
     },
 
     useZoomed(streamKey: string): boolean {
         return useZoomStore((state: ZoomState) => state[streamKey] ?? false);
     },
 
-    baseSize,
+    videoSize,
 
-    panBounds(wrapper: HTMLElement, zoom: number) {
-        const [width, height] = baseSize(wrapper);
+    panBounds(ref: WrapperRef, zoom: number) {
+        const wrapper = ref.current;
+        if (!wrapper) return [0, 0];
 
+        const [width, height] = videoSize(ref);
         return [
             Math.max(0, (width * zoom - wrapper.clientWidth) / 2),
             Math.max(0, (height * zoom - wrapper.clientHeight) / 2)
         ];
     },
 
-    indicator(wrapper: HTMLElement | null, zoom: number, pan: { x: number; y: number; }) {
-        if (!wrapper) return [1 / zoom, 1 / zoom, 0.5, 0.5];
-
-        const [width, height] = baseSize(wrapper);
+    indicator(ref: WrapperRef, zoom: number, pan: { x: number; y: number; }) {
+        const wrapper = ref.current;
+        const [width, height] = videoSize(ref);
+        if (!wrapper || !width || !height) return [1 / zoom, 1 / zoom, 0.5, 0.5];
 
         return [
             Math.min(1, wrapper.clientWidth / (width * zoom)),
@@ -98,5 +126,9 @@ export default definePlugin({
             0.5 - pan.x / (width * zoom),
             0.5 - pan.y / (height * zoom)
         ];
+    },
+
+    resizeScale(ref: WrapperRef, oldWidth: number, oldHeight: number, width: number, height: number) {
+        return [...fitVideo(ref, oldWidth, oldHeight), ...fitVideo(ref, width, height)];
     }
 });
