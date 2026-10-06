@@ -1,12 +1,12 @@
 # streamZoomFill
 
-zoom into a stream and it actually fills your screen instead of being locked inside a 16:9 box
+streams fill your screen when you zoom in
 
 ![stock vs streamZoomFill](screenshot.png)
 
 ## why
 
-in discord, when zooming in on a stream, you are limited by the box shape of that stream. in vertical displays and narrow windows, you'll have big black bars even at high zoom levels
+when zooming in on a stream you are limited by the box shape of that stream. in vertical displays and narrow windows, you'll have big black bars even at high zoom levels
 
 ## what it does
 
