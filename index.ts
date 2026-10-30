@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { Devs } from "@utils/constants";
 import { proxyLazy } from "@utils/lazy";
 import definePlugin from "@utils/types";
 import { ReactDOM, useLayoutEffect, zustandCreate } from "@webpack/common";
@@ -45,7 +46,7 @@ function clampPan(ref: WrapperRef) {
 export default definePlugin({
     name: "StreamZoomFill",
     description: "No more black bars when you zoom into a stream",
-    authors: [{ name: "Nays", id: 344871509677965313n }],
+    authors: [Devs.Nays],
     tags: ["Voice", "Media", "Utility"],
 
     patches: [
